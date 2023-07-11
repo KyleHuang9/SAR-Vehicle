@@ -14,6 +14,16 @@ def get_activation(name="silu", inplace=True):
         raise AttributeError("Unsupported act type: {}".format(name))
     return module
 
+class BaseLinear(nn.Module):
+    def __init__(self, in_features, out_features, bias=True, act="relu"):
+        super().__init__()
+        self.fc = nn.Linear(in_features, out_features, bias)
+        self.bn = nn.BatchNorm1d(out_features)
+        self.act = get_activation(act, inplace=True)
+
+    def forward(self, x):
+        return self.act(self.bn(self.fc(x)))
+
 class BaseConv(nn.Module):
     """A Conv2d -> Batchnorm -> silu/leaky relu block"""
 
@@ -67,23 +77,23 @@ class Classify(nn.Module):
     
     def __init__(self, nc, base_channels):
         super().__init__()
-        self.stem = BaseConv(in_channels=1, out_channels=base_channels, ksize=3, stride=2) # 24x16
+        self.stem = BaseConv(in_channels=1, out_channels=base_channels // 2, ksize=3, stride=1) # /1
         self.block1 = nn.Sequential(
-                    DWConv(in_channels=base_channels, out_channels=base_channels, ksize=3, stride=1),
-                    DWConv(in_channels=base_channels, out_channels=base_channels * 2, ksize=3, stride=2),
-        ) # 12x8
+                    BaseConv(in_channels=base_channels // 2, out_channels=base_channels, ksize=3, stride=1),
+                    BaseConv(in_channels=base_channels, out_channels=base_channels * 2, ksize=3, stride=2),
+        ) # /2
         self.block2 = nn.Sequential(
-                    DWConv(in_channels=base_channels * 2, out_channels=base_channels * 2, ksize=3, stride=1),
-                    DWConv(in_channels=base_channels * 2, out_channels=base_channels * 4, ksize=3, stride=2),
-        ) # 6x4
+                    BaseConv(in_channels=base_channels * 2, out_channels=base_channels * 2, ksize=3, stride=1),
+                    BaseConv(in_channels=base_channels * 2, out_channels=base_channels * 4, ksize=3, stride=2),
+        ) # /4
         self.block3 = nn.Sequential(
-                    DWConv(in_channels=base_channels * 4, out_channels=base_channels * 4, ksize=3, stride=1),
-                    DWConv(in_channels=base_channels * 4, out_channels=base_channels * 4, ksize=3, stride=1),
-                    DWConv(in_channels=base_channels * 4, out_channels=base_channels * 8, ksize=3, stride=2),
-        )
+                    BaseConv(in_channels=base_channels * 4, out_channels=base_channels * 4, ksize=3, stride=1),
+                    BaseConv(in_channels=base_channels * 4, out_channels=base_channels * 8, ksize=3, stride=2),
+        ) # /8
         self.pool = nn.AdaptiveAvgPool2d((1, 1))
         self.flatten = nn.Flatten()
-        self.fc = nn.Linear(base_channels * 8, nc)
+        self.fc1 = BaseLinear(in_features=base_channels * 8, out_features=base_channels * 2)
+        self.fc2 = nn.Linear(base_channels * 2, nc)
 
     def forward(self, x):
         x = self.stem(x)
@@ -92,5 +102,6 @@ class Classify(nn.Module):
         x = self.block3(x)
         x = self.pool(x)
         x = self.flatten(x)
-        output = self.fc(x)
+        x = self.fc1(x)
+        output = self.fc2(x)
         return output

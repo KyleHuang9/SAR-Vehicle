@@ -12,6 +12,7 @@ from .data_augment import (
     augment_hsv,
     letterbox,
     random_affine,
+    gaussian_blur,
 )
 from module.utils.event import LOGGER
 from module.utils.show import show
@@ -25,6 +26,7 @@ class TrainValDataset(Dataset):
     def __init__(
         self,
         dir,
+        nc,
         img_size=(32, 32),
         batch_size=32,
         augment=False,
@@ -91,7 +93,9 @@ class TrainValDataset(Dataset):
             line = line.strip("\n")
             line = line.split(" ")
             imgs_path.append(line[0])
-            labels.append(int(line[1]))
+            label = [(0.1 / (self.nc - 1)) for i in range(self.nc)]
+            label[int(line[1])] = 0.9
+            labels.append(label)
         return imgs_path, labels
 
     def get_augument(self, index):
@@ -124,6 +128,10 @@ class TrainValDataset(Dataset):
             vgain=self.hyp["hsv_v"],
         )
 
+        # Gaussian blur
+        if random.random() < self.hyp["gaussian"]:
+            img = gaussian_blur(img, self.hyp['gau_d'])
+
         # Flip up-down
         if random.random() < self.hyp["flipud"]:
             img = np.flipud(img)
@@ -133,3 +141,59 @@ class TrainValDataset(Dataset):
             img = np.fliplr(img)
 
         return img, labels
+
+class TestDataset(Dataset):
+    def __init__(
+        self,
+        dir,
+        nc,
+        img_size=(32, 32),
+        batch_size=32,
+        rank=-1,
+    ):
+        super().__init__()
+        t1 = time.time()
+        self.__dict__.update(locals())
+        self.main_process = self.rank in (-1, 0)
+        self.img_paths = self.get_imgs(self.dir)
+        t2 = time.time()
+        if self.main_process:
+            LOGGER.info(f"%.1fs for dataset initialization." % (t2 - t1))
+
+    def __len__(self):
+        """Get the length of dataset"""
+        return len(self.img_paths)
+
+    def __getitem__(self, index):
+        img, (h0, w0), (h, w), path = self.load_image(index)
+        
+        h, w, c = img.shape
+        img = img.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
+        img = img[None, 0]
+        img = np.ascontiguousarray(img)
+        return torch.from_numpy(img), path
+
+    def load_image(self, index, force_load_size=None):
+        path = self.img_paths[index]
+        try:
+            im = cv2.imread(path)
+            assert im is not None, f"opencv cannot read image correctly or {path} not exists"
+        except:
+            im = cv2.cvtColor(np.asarray(Image.open(path)), cv2.COLOR_RGB2BGR)
+            assert im is not None, f"Image Not Found {path}, workdir: {os.getcwd()}"
+
+        h0, w0 = im.shape[:2]  # origin shape
+        return im, (h0, w0), im.shape[:2], path
+
+    def get_imgs(self, dir):
+        assert osp.exists(dir), f"{dir} is an invalid directory path!"
+        txt = osp.join(dir, "test.txt")
+        assert osp.exists(txt), f"{txt} is an invalid path!"
+        file = open(txt, "r")
+        imgs_path = []
+
+        for line in file:
+            line = line.strip("\n")
+            line = line.split(" ")
+            imgs_path.append(line[0])
+        return imgs_path

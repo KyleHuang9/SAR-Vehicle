@@ -8,8 +8,9 @@ from torchvision import models
 from tqdm import tqdm
 
 import tools.eval as eval
+import tools.test as test
 from module.model.net import Model
-from module.data.data_load import create_dataloader
+from module.data.data_load import create_dataloader, create_testloader
 from module.utils.event import LOGGER, NCOLS
 
 class Trainer:
@@ -27,8 +28,9 @@ class Trainer:
         self.model = self.get_model().to(device=self.device)
         self.train_dataloader = self.get_dataloader(self.txt_dir, task="train")
         self.val_dataloader = self.get_dataloader(self.txt_dir, task="val")
+        self.test_dataloader = create_testloader(self.txt_dir, self.nc, self.img_size, self.batch_size, rank=-1, workers=self.args.workers)
         self.optimizer = torch.optim.SGD(self.model.parameters(), lr=cfg.params.lr0, momentum=cfg.params.momentum, weight_decay=cfg.params.weight_decay)
-        self.loss = nn.CrossEntropyLoss().to(device=self.device)
+        self.loss = nn.BCEWithLogitsLoss().to(device=self.device)
         self.best_acc = 0
         self.eval_interval = cfg.params.eval_interval
 
@@ -56,6 +58,7 @@ class Trainer:
             if (epoch + 1) % self.eval_interval == 0:
                 self.eval_and_save()
             self.save_last_model()
+        LOGGER.info(f"\nThe best accuracy is {self.best_acc}")
 
 
     def get_model(self):
@@ -73,7 +76,7 @@ class Trainer:
             augment = False
         else:
             augment = True
-        dataloader = create_dataloader(txt_dir, img_size=self.img_size, batch_size=self.batch_size, hyp=dict(self.cfg.data_aug),
+        dataloader = create_dataloader(txt_dir, self.nc, img_size=self.img_size, batch_size=self.batch_size, hyp=dict(self.cfg.data_aug),
                             augment=augment, rank=-1, workers=self.args.workers, shuffle=True, task=task)
         return dataloader
 
@@ -88,6 +91,16 @@ class Trainer:
                                                                 (self.mean_loss), self.optimizer.param_groups[0]["lr"]))
 
     def eval_and_save(self):
+        train_acc, train_acc_list = eval.run(model=self.model,
+                        dataloader=self.train_dataloader,
+                        model_path=None,
+                        txt_dir=self.txt_dir,
+                        img_size=self.img_size,
+                        nc=self.nc,
+                        batch_size=self.batch_size,
+                        workers=self.args.workers,
+                        device=self.device,
+                        task="val")
         acc, acc_list= eval.run(model=self.model,
                         dataloader=self.val_dataloader,
                         model_path=None,
@@ -97,15 +110,31 @@ class Trainer:
                         batch_size=self.batch_size,
                         workers=self.args.workers,
                         device=self.device,
-                        task="val")
+                        task="test")
         for i in range(len(acc_list)):
-            LOGGER.info(f"{i}: {acc_list[i]}")
-        LOGGER.info(f"The accuracy is {acc}.")
+            LOGGER.info(f"{i}: {acc_list[i]} \t {train_acc_list[i]}")
+        LOGGER.info(f"The val accuracy is {train_acc}.")
+        LOGGER.info(f"The test accuracy is {acc}.")
 
         if acc > self.best_acc:
             file_name = osp.join(self.args.output_dir, "best_ckpt.pt")
             torch.save(self.model, file_name)
             self.best_acc = acc
+            self.test()
+
+    def test(self):
+        test.run(
+            model=self.model,
+            dataloader=self.test_dataloader,
+            model_path=None,
+            txt_dir=self.txt_dir,
+            output_dir=self.args.output_dir,
+            img_size=self.img_size,
+            nc=self.nc,
+            batch_size=self.batch_size,
+            workers=self.args.workers,
+            device=self.device,
+        )
 
     def save_last_model(self):
         self.model.eval()

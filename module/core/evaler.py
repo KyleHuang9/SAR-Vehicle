@@ -29,6 +29,7 @@ class Evaler:
 
             output = torch.softmax(output, dim=-1)
             conf, predict = torch.max(output, -1, keepdim=True)
+            _, targets = torch.max(targets, -1)
 
             assert len(predict) == len(targets)
 
@@ -49,6 +50,6 @@ class Evaler:
         return model
 
     def get_dataloader(self, txt_dir, task):
-        dataloader = create_dataloader(txt_dir, img_size=self.img_size, batch_size=self.batch_size, hyp=None,
+        dataloader = create_dataloader(txt_dir, self.nc, img_size=self.img_size, batch_size=self.batch_size, hyp=None,
                             augment=False, rank=-1, workers=self.workers, shuffle=True, task=task)
         return dataloader

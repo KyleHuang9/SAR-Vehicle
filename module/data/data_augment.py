@@ -20,6 +20,9 @@ def augment_hsv(im, hgain=0.5, sgain=0.5, vgain=0.5):
         im_hsv = cv2.merge((cv2.LUT(hue, lut_hue), cv2.LUT(sat, lut_sat), cv2.LUT(val, lut_val)))
         cv2.cvtColor(im_hsv, cv2.COLOR_HSV2BGR, dst=im)  # no return needed
 
+def gaussian_blur(im, d=0.2):
+    im = cv2.GaussianBlur(im, (3, 3), d)
+    return im
 
 def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleup=True, stride=32):
     '''Resize and pad image while meeting stride-multiple constraints.'''
