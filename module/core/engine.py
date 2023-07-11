@@ -6,6 +6,7 @@ import torchvision
 from torch import nn
 from torchvision import models
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 import tools.eval as eval
 import tools.test as test
@@ -34,6 +35,10 @@ class Trainer:
         self.best_acc = 0
         self.eval_interval = cfg.params.eval_interval
 
+        self.train_loss = []
+        self.train_acc = []
+        self.val_acc = []
+
     def train(self):
         self.create_output_dir()
         total_step = len(self.train_dataloader)
@@ -54,6 +59,7 @@ class Trainer:
                 self.optimizer.step()
 
                 self.print_details(epoch, step, loss)
+                self.train_loss.append(loss.item())
 
             if (epoch + 1) % self.eval_interval == 0:
                 self.eval_and_save()
@@ -116,6 +122,9 @@ class Trainer:
         LOGGER.info(f"The val accuracy is {train_acc}.")
         LOGGER.info(f"The test accuracy is {acc}.")
 
+        self.train_acc.append(train_acc)
+        self.val_acc.append(acc)
+
         if acc > self.best_acc:
             file_name = osp.join(self.args.output_dir, "best_ckpt.pt")
             torch.save(self.model, file_name)
@@ -152,3 +161,22 @@ class Trainer:
         else:
             for param in self.optimizer.param_groups:
                 param["lr"] = (math.cos(epoch * (math.pi / 2) / self.max_epoch) * (self.cfg.params.lr0 - self.cfg.params.lr1)) + self.cfg.params.lr1
+    
+    def show_save_process(self):
+        # loss
+        plt.figure()
+        x = [i for i in range(len(self.train_loss))]
+        plt.plot(x, self.train_loss)
+        plt.title('Train Loss')
+        plt.xlabel('Epochs')
+        plt.ylabel('Loss')
+        plt.savefig(osp.join(self.args.output_dir, 'loss.png'))
+
+        # acc
+        plt.figure()
+        x = [i for i in range(len(self.train_acc))]
+        plt.plot(x, self.train_acc, 'b', x, self.val_acc, 'r')
+        plt.title('Accuracy')
+        plt.xlabel('Epochs')
+        plt.ylabel('Acc')
+        plt.savefig(osp.join(self.args.output_dir, 'accuracy.png'))

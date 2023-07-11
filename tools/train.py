@@ -21,6 +21,7 @@ def main(args):
     cfg = Config.fromfile(args.conf_file)
     trainer = Trainer(cfg=cfg, args=args)
     trainer.train()
+    trainer.show_save_process()
 
 if __name__ == '__main__':
     args = get_args_parser().parse_args()
