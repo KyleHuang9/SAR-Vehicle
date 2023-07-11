@@ -15,14 +15,24 @@ def get_args_parser(add_help=True):
     parser.add_argument('--output-dir', default='./Output', type=str, help='Output directory')
     return parser
 
-def run(model, dataloader, model_path, txt_dir, output_dir, img_size, nc, batch_size, workers, device):
-    tester = Tester(txt_dir=txt_dir, output_dir=output_dir, img_size=img_size, nc=nc, batch_size=batch_size, workers=workers,device=device)
+def run(model, dataloader, model_path, model_num, results, txt_dir, output_dir, img_size, nc, batch_size, workers, device):
+    tester = Tester(
+        txt_dir=txt_dir,
+        output_dir=output_dir,
+        dataloader=dataloader,
+        results=results,
+        img_size=img_size,
+        nc=nc,
+        batch_size=batch_size,
+        workers=workers,
+        device=device)
     if model_path != None:
         model = tester.get_model(model_path)
     if dataloader == None:
         dataloader = tester.get_dataloader(txt_dir)
-    tester.test(model=model, dataloader=dataloader)
+    results = tester.test(model=model, dataloader=dataloader, num=model_num)
     LOGGER.info("\nTest Finish!")
+    return results
 
 def main(args):
     cfg = Config.fromfile(args.conf_file)

@@ -6,7 +6,7 @@ from module.data.data_load import create_testloader
 from module.utils.event import NCOLS
 
 class Tester:
-    def __init__(self, txt_dir, output_dir, img_size, nc, batch_size, workers, device):
+    def __init__(self, txt_dir, output_dir, dataloader, results, img_size, nc, batch_size, workers, device):
         self.txt_dir = txt_dir
         self.output_dir = output_dir
         self.img_size = img_size
@@ -15,13 +15,12 @@ class Tester:
         self.workers = workers
         self.device = device
 
+        self.result = results
+
         assert osp.exists(self.output_dir), "Test Output dir is not exist!"
     
-    def test(self, model, dataloader):
+    def test(self, model, dataloader, num):
         pbar = tqdm(dataloader, desc=f"Inferencing model in test datasets.", ncols=NCOLS)
-
-        output_txt = osp.join(self.output_dir, "test-result.txt")
-        txt = open(output_txt, 'w')
 
         for i, (imgs, paths) in enumerate(pbar):
             imgs = imgs.to(self.device, non_blocking=True).float() / 255
@@ -30,11 +29,10 @@ class Tester:
 
             output = torch.softmax(output, dim=-1)
             conf, predict = torch.max(output, -1, keepdim=True)
-            
-            for j in range(len(imgs)):
-                txt.write(paths[j] + " " + str(predict[j].item()) + "\n")
-            
-        txt.close()
+
+            for j in range(len(paths)):
+                self.result[paths[j]][num] = predict[j].item()
+        return self.result
 
     def get_model(self, model_path):
         model = torch.load(model_path)

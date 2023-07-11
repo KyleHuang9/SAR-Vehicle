@@ -6,11 +6,12 @@ dataset = dict(
 
 model = dict(
     model=None,
+    model_num=100,
     base_channels=32,
 )
 
 params = dict(
-    epoch=100,
+    epoch=50,
     batch_size=32,
     lr0=0.002,
     lr1=0.0001,
@@ -21,7 +22,7 @@ params = dict(
 )
 
 data_aug = dict(
-    augment=1.0,
+    augment=0.9,
     hsv_h=0.015,
     hsv_s=0.5,
     hsv_v=0.5,

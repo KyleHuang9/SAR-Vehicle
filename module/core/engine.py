@@ -38,6 +38,7 @@ class Trainer:
         self.train_loss = []
         self.train_acc = []
         self.val_acc = []
+        self.best_model = self.model
 
     def train(self):
         self.create_output_dir()
@@ -65,7 +66,7 @@ class Trainer:
                 self.eval_and_save()
             self.save_last_model()
         LOGGER.info(f"\nThe best accuracy is {self.best_acc}")
-
+        return self.best_model, self.test_dataloader
 
     def get_model(self):
         if self.cfg.model.model is None:
@@ -125,25 +126,11 @@ class Trainer:
         self.train_acc.append(train_acc)
         self.val_acc.append(acc)
 
-        if acc > self.best_acc:
+        if acc >= self.best_acc:
             file_name = osp.join(self.args.output_dir, "best_ckpt.pt")
             torch.save(self.model, file_name)
             self.best_acc = acc
-            self.test()
-
-    def test(self):
-        test.run(
-            model=self.model,
-            dataloader=self.test_dataloader,
-            model_path=None,
-            txt_dir=self.txt_dir,
-            output_dir=self.args.output_dir,
-            img_size=self.img_size,
-            nc=self.nc,
-            batch_size=self.batch_size,
-            workers=self.args.workers,
-            device=self.device,
-        )
+            self.best_model = self.model
 
     def save_last_model(self):
         self.model.eval()
