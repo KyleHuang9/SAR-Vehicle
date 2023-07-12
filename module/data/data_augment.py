@@ -62,7 +62,6 @@ def random_affine(img, degrees=10, translate=.1, scale=.1, shear=10,
     M, s = get_transform_matrix(img.shape[:2], (height, width), degrees, scale, shear, translate)
     if (M != np.eye(3)).any():  # image changed
         img = cv2.warpAffine(img, M[:2], dsize=(width, height), borderValue=(0, 0, 0))
-
     return img
 
 def get_transform_matrix(img_shape, new_shape, degrees, scale, shear, translate):

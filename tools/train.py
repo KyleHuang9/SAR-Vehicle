@@ -7,6 +7,7 @@ if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
 import os.path as osp
+import numpy as np
 
 from module.core.engine import Trainer
 from module.utils.config import Config
@@ -29,14 +30,18 @@ def creat_result_list(paths, num):
     
 def main(args):
     cfg = Config.fromfile(args.conf_file)
+    aug_prob = cfg.data_aug.augment
     transdata()
-    trainer = Trainer(cfg=cfg, args=args)
     
     paths = get_paths()
     results = creat_result_list(paths, cfg.model.model_num)
 
     for i in range(cfg.model.model_num):
         transdata()
+        if aug_prob > 0.5:
+            cfg.data_aug.augment = np.random.uniform(0.5, aug_prob)
+
+        trainer = Trainer(cfg=cfg, args=args)
         model, test_dataloader = trainer.train()
 
         results = test.run(

@@ -6,8 +6,8 @@ dataset = dict(
 
 model = dict(
     model=None,
-    model_num=100,
-    base_channels=32,
+    model_num=10,
+    base_channels=16,
 )
 
 params = dict(
@@ -22,7 +22,7 @@ params = dict(
 )
 
 data_aug = dict(
-    augment=0.9,
+    augment=1.0,
     hsv_h=0.015,
     hsv_s=0.5,
     hsv_v=0.5,
